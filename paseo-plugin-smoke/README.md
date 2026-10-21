@@ -9,3 +9,5 @@ its job and logs, and exercise rerunning failed jobs. It will be changed to
 
 Issues, PR comments, review threads and test sessions are labelled with
 `[Paseo live test]` so they can be recognized during manual inspection.
+
+Manual verification follow-up: this PR stays open for checking the Paseo plugin.
