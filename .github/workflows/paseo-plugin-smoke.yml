@@ -1,0 +1,31 @@
+name: Paseo plugin live test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "paseo-plugin-smoke/**"
+      - ".github/workflows/paseo-plugin-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Plugin smoke check
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify test marker
+        shell: bash
+        run: |
+          actual="$(cat paseo-plugin-smoke/ci-status.txt)"
+          echo "Paseo GitHub Workspace live verification"
+          echo "Expected marker: pass"
+          echo "Actual marker: $actual"
+          if [ "$actual" != "pass" ]; then
+            echo "::error::Intentional test failure. Change paseo-plugin-smoke/ci-status.txt to pass."
+            exit 1
+          fi
+          echo "Smoke check passed."
