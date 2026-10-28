@@ -1,16 +1,30 @@
-# TUI profile preview
+# Theme and terminal previews
 
-![TUI profile preview](tui-preview.png)
+## Transparent charts on three backgrounds
 
-## Custom streak card
+![Light, Dark and Dark dimmed previews of the same real-data charts](theme-matrix.png)
 
-![Gray and amber streak card](streak-card.png)
+The left column uses the light SVG palette. Both dark columns use exactly the same dark SVG files; the different backgrounds remain visible through them. These are rasterized chart previews, not screenshots of GitHub's README renderer. The public README retains the full six-pane animated terminal, using the same transparent background and light/dark palettes.
 
-- [Full-resolution still image](tui-preview.png)
-- [Current animated SVG](../../assets/header.svg)
-- [Standalone streak SVG](../../assets/streak.svg)
-- [Previous design](previous.svg)
+The snapshot timestamp is printed at the bottom of the preview. It is preserved when regenerating offline. Preview PNGs are review artifacts and do not refresh hourly; the profile SVGs and saved JSON do.
 
-This is a local review snapshot. Contributions appear above the Timeline. The full SVG includes entrance, bar-growth, typing, and cursor animations. Preview files keep the original GitHub data timestamp; the hourly workflow refreshes the profile and standalone streak SVGs.
+## Profile terminal
 
-Layout inspiration: [btop](https://github.com/aristocratos/btop). The SVG renderer is implemented locally with Python; no third-party action or extra secret is required.
+![Dark terminal still preview](tui-preview.png)
+
+![Light terminal still preview](light-terminal.png)
+
+- [Animated dark terminal](../../assets/header-dark.svg)
+- [Animated light terminal](../../assets/header-light.svg)
+- [Earlier design](previous.svg)
+
+## Standalone streak visualization
+
+![Streak card on a Dark dimmed background](streak-card.png)
+
+- [Dark SVG](../../assets/streak-dark.svg)
+- [Light SVG](../../assets/streak-light.svg)
+
+The six-pane terminal retains entrance, bar-growth, typewriter, cursor and streak-ring animations. Reduced-motion preferences disable the animations. Layout inspiration: [btop](https://github.com/aristocratos/btop).
+
+See [data definitions and maintenance](../design.md) for API sources, hourly scheduling, theme limitations, and local commands.

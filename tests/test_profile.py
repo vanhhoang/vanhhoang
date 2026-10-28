@@ -148,7 +148,7 @@ class ProfileTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / 'header.svg'
             target.write_text('last successful snapshot')
-            with patch.object(sys, 'argv', ['generate_profile.py', '--output', str(target)]), \
+            with patch.object(sys, 'argv', ['generate_profile.py', '--output-dir', directory]), \
                  patch.object(profile, 'fetch', side_effect=[json.dumps(person), '[]', '<html>Unavailable</html>']):
                 with self.assertRaises(ValueError):
                     profile.main()

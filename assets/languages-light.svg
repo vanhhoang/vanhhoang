@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="440" height="250" viewBox="0 0 440 250" role="img" aria-labelledby="title desc">
+<title id="title">Primary language distribution</title><desc id="desc">Each original public repository counts once. Forks and unclassified repositories excluded. Snapshot 2026-10-28T06:07:59.984850+00:00.</desc>
+<style>
+text{font:14px 'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;fill:#303944;}
+.bright{fill:#1f2328;font-weight:700;}.dim{fill:#596779;}.accent{fill:#85551d;}
+.small{font-size:12px;}.tiny{font-size:11px;}
+.panel{fill:#8c959f;fill-opacity:.04;stroke:#8c959f;stroke-opacity:.35;}
+.track{fill:#8c959f;fill-opacity:.16;}
+.bar{animation:appear .6s ease-out both;}
+@keyframes appear{from{opacity:0;}to{opacity:1;}}
+@media(prefers-reduced-motion:reduce){.bar{animation:none!important;}}
+</style>
+<rect x="1" y="1" width="438" height="248" rx="5" class="panel"/><text x="22" y="29" class="small">PRIMARY LANGUAGE / ORIGINAL REPOS</text><text x="22" y="68" class="small">Python</text><text x="418" y="68" class="small" text-anchor="end">8/10 · 80%</text><rect x="22" y="78" width="396" height="8" class="track"/><rect x="22" y="78" width="316.80" height="8" class="bar" fill="#436b8a"/><text x="22" y="113" class="small">JavaScript</text><text x="418" y="113" class="small" text-anchor="end">1/10 · 10%</text><rect x="22" y="123" width="396" height="8" class="track"/><rect x="22" y="123" width="39.60" height="8" class="bar" fill="#667383"/><text x="22" y="158" class="small">HTML</text><text x="418" y="158" class="small" text-anchor="end">1/10 · 10%</text><rect x="22" y="168" width="396" height="8" class="track"/><rect x="22" y="168" width="39.60" height="8" class="bar" fill="#7a687c"/><text x="22" y="210" class="dim small">3 languages / 10 classified repos</text><text x="22" y="232" class="dim tiny">Repository share, not code bytes or proficiency.</text>
+</svg>

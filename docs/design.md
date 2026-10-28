@@ -1,56 +1,77 @@
-# Terminal profile
+# Theme-aware terminal profile
 
-A dark charcoal terminal with gray text, square borders, subtle scanlines, shell prompts, a typewriter command, and a blinking block cursor. Muted amber highlights repository/star counts, the contribution total, and the cursor. Charts use desaturated slate-blue and gray shades. Reduced-motion visitors see a static command. The SVG is an illustration; actual navigation links appear below it in the README.
+The README preserves the original animated six-pane terminal: Profile, GitHub Pulse, Activity, Language Mix, Contributions, and Timeline. It embeds a single full-width dashboard for the visitor's light/dark mode, followed by the original Repositories, Activity and Stars navigation. The SVG background is transparent; neutral panel fills and borders use low opacity rather than a fixed page color, allowing GitHub's Light, Dark and Dark dimmed backgrounds to show through.
 
-The layout uses six framed TUI panes inspired by btop: Profile, GitHub Pulse, Activity, Language Mix, Contributions, and Timeline. Pane titles interrupt the thin borders; amber highlights the profile pane and key counters. Identity appears once in the profile pane. The public README ends with a compact row of links: Repositories, Activity, and Stars. Technical explanations and maintenance commands live in this document.
+The two dashboard palettes are selected with GitHub's `#gh-dark-mode-only` and `#gh-light-mode-only` fragments on explicit image links. The dark palette is designed to remain readable on both Dark and Dark dimmed. The SVG does not detect every named theme or inherit GitHub CSS variables; its typography and chart colors retain the selected light/dark palette. Counts and text labels make meaning available without relying only on hue. Public names and bios are escaped as text.
 
-## Animation
+The dashboard is generated as `assets/header-dark.svg` and `assets/header-light.svg`, with `assets/header.svg` preserving its previous URL. Standalone charts and animated streak cards remain available in both palettes for reuse and [preview](previews/README.md). Maintenance notes stay in this document instead of expanding the public profile into a separate report.
 
-The panes appear sequentially and language/event bars grow to their actual values. The closing command types in and its cursor blinks. A three-column streak card appears above the contribution heatmap, with Year Contributions, Current Streak, and Longest Streak. Its amber ring draws on entry and the flame pulses gently when a streak is active. The entire Contributions pane remains above the daily Timeline.
+## Data sources and definitions
 
-All motion uses embedded SVG/CSS with no scripts or external services. `prefers-reduced-motion: reduce` disables every animation, reveals all content immediately, and displays the final command as static text. A [review preview](previews/README.md) includes a PNG and the previous SVG for comparison.
+All published values come from GitHub. No sample values are used when refreshing the real profile.
 
-## Data and meaning
+| Display | Source / definition |
+| --- | --- |
+| Identity, joined date, followers, following, public gists | `GET /users/{login}`. Account age is calculated at the UTC snapshot date. An empty bio uses a general welcome message, without inventing a job title or employer. |
+| Owned public repositories, originals, forks | `GET /users/{login}/repos?type=owner&per_page=100&page=N`; fetch every page. Archived repositories remain included. |
+| Stars received | Sum of `stargazers_count` on original owned public repositories; forks excluded. Starring someone else's repository is an outgoing activity event and does not increase this total. |
+| Language mix | Each original public repository contributes one count for its primary `language`. Forks and unclassified repositories are excluded. This measures repository share, not code bytes, expertise or coding time. |
+| Contributions / heatmap | GraphQL `user.contributionsCollection(from:, to:).contributionCalendar`: exact `contributionCount`, `contributionLevel`, and `totalContributions`. The query requests today and the preceding 364 UTC dates. Calendar data can include anonymized counts according to GitHub's visibility rules; private repository names and commit details are never queried. |
+| Calendar fallback | Without a token, or if GraphQL explicitly rejects the workflow integration's account-level access, read GitHub's public contribution calendar. Parse exact counts from each day's tooltip, never infer them from the 0–4 heatmap level. Filter to the same 365 UTC dates and calculate the total from those counts. The actual source is recorded in the snapshot. |
+| Current / longest streak | Consecutive dates with a positive contribution count in the displayed 365-date window. Yesterday remains eligible while today is in progress. Two empty dates end the current streak. Longest ties use the earliest run. These are window records, not lifetime records. |
+| Activity / timeline | `GET /users/{login}/events/public`, up to three 100-event pages. Ignore private, future and older-than-30-day events; deduplicate by event ID. Group into UTC dates. The chart total covers 14 UTC dates; the available-window total covers 30 days. Push events are not commit counts. |
 
-The generator reads public information directly from GitHub:
+GitHub's event feed exposes at most 300 recent events and can lag by 30 seconds to 6 hours. A zero bar means no events were returned for that UTC date; it does not prove there was no activity. The terminal labels the available API window. Full activity history would require a separate collection service; this repository does not pretend the events endpoint provides it.
 
-- Identity and account creation date: `GET /users/vanhhoang`. An empty bio uses a general welcome message. No location, employer, or job title is inferred.
-- Repositories, followers, following, and public gists: public account/repository data. All repository pages are fetched.
-- Stars received: sum of stargazer counts on original public repositories, excluding forks.
-- Contribution activity: the calendar and yearly total visible on the public GitHub profile. These are GitHub's contribution definitions, not a commit count. The public chart may include anonymized private contributions if the account owner enables them.
-- Active days and longest streak: dates with nonzero activity in that displayed calendar; the longest streak counts consecutive dates, not contribution intensity. Future dates are excluded.
-- Streak card: totals and streaks are scoped to the displayed contribution year, not lifetime account activity. Current streak ends today or yesterday; yesterday remains eligible while today is in progress. Two empty days end the current streak. Longest-streak ties use the earliest run in the displayed year. Each streak shows its actual date range, with an explicit empty state when no run exists. The ring is decorative, not a completion percentage. A standalone version is generated as `assets/streak.svg` from the same data and layout.
-- Public event monitor and daily log: `GET /users/vanhhoang/events/public`, paginated up to GitHub's 300-event / 30-day limit. The histogram shows the last 14 UTC dates from those returned events; the type breakdown covers the available 30-day window. Push events are not commit counts. Daily logs summarize event types without featuring any repository. GitHub may delay event delivery by 30 seconds to 6 hours. Missing API data fails the refresh; it is not substituted with zero.
-- Account age: days since the public account creation date, as of the UTC snapshot date. Source/fork ratio includes all owned public repositories; archived repositories are counted separately.
-- Languages: each original public repository's primary language, counted once per repository. Forks and repositories with no classified language are excluded. Percentages describe repository counts, not code bytes, skill level, or time spent coding.
+## Integrity and saved data
 
-Sources:
+`assets/profile-data.json` contains the most recently fetched real data, the UTC fetch timestamp, a schema version and the contribution source. Only the public fields needed to regenerate this profile are stored. Credentials are never included.
 
-- https://docs.github.com/en/rest/users/users#get-a-user
-- https://docs.github.com/en/rest/repos/repos#list-repositories-for-a-user
-- https://docs.github.com/en/rest/activity/events#list-public-events-for-a-user
-- https://github.com/users/vanhhoang/contributions
-- https://docs.github.com/en/account-and-profile/concepts/contributions-visible-on-your-profile
+Before replacing anything, the generator checks that:
 
-Streak card layout reference: https://github.com/DenverCoder1/github-readme-streak-stats. The implementation here uses the local Python renderer and the existing public contribution calendar rather than the hosted widget.
+- All 365 dates have a nonnegative integer contribution count and a valid matching activity level.
+- Daily contribution counts add up to the reported total.
+- GraphQL has no errors or missing data. Only an explicit integration-permission rejection may switch to the validated public-calendar fallback; unrelated API errors fail the refresh.
+- Every generated SVG parses as XML.
 
-## Refresh
+Fetch, validation or rendering failures leave the previous README, snapshot and charts intact. Outputs are prepared in memory, then each file is replaced atomically. A filesystem failure during the final write can require rerunning the generator; GitHub Actions does not commit a failed generation.
 
-`.github/workflows/update-profile.yml` runs at minute 17 of every hour, on relevant pushes to main/master, and through **Actions → Refresh terminal profile → Run workflow**. It uses the built-in `GITHUB_TOKEN`; no personal access token or external image service is required. The token is sent only to GitHub's REST API. The job writes `assets/header.svg` and `assets/streak.svg` back to the repo.
+The snapshot is also a reproducible offline input. Offline regeneration keeps its original sync time, so stale data cannot appear freshly fetched.
 
-After the files reach the repository's default branch, the workflow can refresh the profile automatically. This is a periodic snapshot, not a live socket. The terminal displays its UTC sync time; GitHub Actions scheduling and image caching may delay updates. Scheduled workflows can be disabled after 60 days of inactivity in public repositories. A manual run or re-enabling the workflow restores updates.
+## Automatic refresh
 
-The contribution calendar is parsed from GitHub's public HTML. If GitHub changes its markup or a fetch fails, generation fails and the last successful SVG remains in place rather than displaying invented zero values. Inspect the Actions run for errors.
+`.github/workflows/update-profile.yml` runs at minute 17 of every hour, on relevant source/test/workflow pushes to main/master, and through **Actions → Refresh terminal profile → Run workflow**. It checks out the latest default branch, runs the regression suite, fetches real GitHub data, and commits the generated README, JSON and SVGs if they changed. Generated-only commits do not trigger this workflow again.
 
-GitHub documentation: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule
+The built-in `GITHUB_TOKEN` is supplied only through the environment and sent only to `api.github.com`. No extra secret is required for the public-calendar fallback. A failed GraphQL request caused by rate limits, a partial response or a server error does not silently become zero data. Workflow failures remain visible in Actions.
+
+This is an hourly snapshot, not a live socket. Scheduling and GitHub image caching can delay what visitors see. Public-repository schedules can be disabled after 60 days without repository activity; re-enable or manually run the workflow if needed. Publishing the modified workflow to the repository's default branch is necessary before it can run.
 
 ## Local commands
 
+Uses only Python's standard library:
+
 ```sh
-python3 scripts/generate_profile.py
+# Fetch public data; uses GraphQL when GITHUB_TOKEN is available.
+python3 scripts/generate_profile.py --username vanhhoang
+
+# Offline regeneration from the last real snapshot, without changing its timestamp.
+python3 scripts/generate_profile.py --from-snapshot assets/profile-data.json
+
+# Verify calculations, response validation, theme output and failure handling.
 python3 -m unittest discover -s tests -v
 ```
 
-The script uses only Python's standard library. `GITHUB_TOKEN` is optional for local runs and increases REST rate limits when supplied through the environment. Do not put a token in source files.
+`--output-dir` and `--readme` let you write previews to another location. Edit `scripts/presentation.py` for the README wrapper and palettes; edit `scripts/generate_profile.py` for data collection or the terminal layout. `README.md` and files in `assets/` are generated and will be overwritten on refresh. The renderer intentionally keeps the original single-terminal README structure across hourly updates.
 
-Edit colors and layout in `scripts/generate_profile.py`; `assets/header.svg` is generated output. README navigation links remain editable in `README.md`.
+Charts use a short fade animation. The supplemental terminal retains its entrance, bar-growth, streak-ring, typewriter and cursor effects. All animations respect `prefers-reduced-motion: reduce`. No JavaScript is embedded in the README or SVGs.
+
+## Sources
+
+- [GitHub theme context for Markdown images](https://github.blog/changelog/2021-11-24-specify-theme-context-for-images-in-markdown/)
+- [Primer theme attributes and palettes](https://github.com/primer/design/blob/main/content/foundations/primitives/getting-started.mdx)
+- [User REST API](https://docs.github.com/en/rest/users/users#get-a-user)
+- [Repository REST API](https://docs.github.com/en/rest/repos/repos#list-repositories-for-a-user)
+- [GraphQL contribution calendar](https://docs.github.com/en/graphql/reference/users#contributioncalendar)
+- [Public calendar fallback](https://github.com/users/vanhhoang/contributions)
+- [Public events and their limits](https://docs.github.com/en/rest/activity/events)
+- [Scheduled workflow behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)

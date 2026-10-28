@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a classic terminal profile from GitHub's public data. No dependencies."""
+"""Fetch real GitHub data and render a theme-aware README and transparent charts."""
 
 import argparse
 from collections import Counter
@@ -15,19 +15,25 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from presentation import apply_theme, render_charts, render_readme
+
 
 ROOT = Path(__file__).resolve().parents[1]
 COLORS = ['#22252b', '#35424c', '#506774', '#7394a1', '#9abcca']
 LANGUAGE_COLORS = ['#91a6b8', '#747d89', '#555e69', '#414953']
 
 
-def fetch(url):
+def fetch(url, payload=None):
     headers = {'User-Agent': 'github-terminal-profile', 'Accept': 'application/vnd.github+json'}
     if url.startswith('https://api.github.com/') and os.environ.get('GITHUB_TOKEN'):
         headers['Authorization'] = 'Bearer ' + os.environ['GITHUB_TOKEN']
+    body = None
+    if payload is not None:
+        headers['Content-Type'] = 'application/json'
+        body = json.dumps(payload).encode('utf-8')
     for attempt in range(3):
         try:
-            with urlopen(Request(url, headers=headers), timeout=30) as response:
+            with urlopen(Request(url, data=body, headers=headers), timeout=30) as response:
                 return response.read().decode('utf-8')
         except (HTTPError, URLError, TimeoutError) as error:
             if isinstance(error, HTTPError) and error.code < 500 and error.code != 429:
@@ -69,7 +75,13 @@ def activity_summary(events, now):
     daily = Counter()
     kinds = Counter()
     log = {}
+    seen = set()
     for event in events:
+        event_id = event.get('id')
+        if event_id is not None and event_id in seen:
+            continue
+        if event_id is not None:
+            seen.add(event_id)
         if not event.get('public', True):
             continue
         created = datetime.fromisoformat(event['created_at'].replace('Z', '+00:00'))
@@ -134,7 +146,6 @@ def streak_card(calendar, today):
     color = '#d9b36c' if stats['current'] else '#69717e'
     svg.append('<circle cx="496" cy="66" r="42" fill="none" stroke="#2b3038" stroke-width="4"/>')
     svg.append(f'<circle class="streak-ring" cx="496" cy="66" r="42" fill="none" stroke="{color}" stroke-width="4" stroke-linecap="round" stroke-dasharray="244 20" transform="rotate(-76 496 66)"/>')
-    svg.append('<rect x="482" y="7" width="28" height="34" fill="#131519"/>')
     flame_class = 'streak-flame' if stats['current'] else ''
     svg.append(f'<path class="{flame_class}" transform="translate(484 8)" d="M12 0C15 8 21 9 21 17C21 23 16 27 11 27C5 27 1 23 1 18C1 14 3 11 6 8C6 13 8 15 10 13C13 10 11 5 12 0Z" fill="{color}"/>')
     text(496, 77, stats['current'], 'accent' if stats['current'] else 'bright', 31)
@@ -147,9 +158,9 @@ def streak_card(calendar, today):
     return ''.join(svg)
 
 
-def render_streak_svg(calendar, now):
+def render_streak_svg(calendar, now, theme='dark'):
     """Standalone version of the card embedded in the Contributions pane."""
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="228" viewBox="0 0 1040 228" role="img" aria-labelledby="title desc">
+    return apply_theme(f'''<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="228" viewBox="0 0 1040 228" role="img" aria-labelledby="title desc">
 <title id="title">GitHub activity / contribution streaks</title>
 <desc id="desc">Contribution statistics for the year displayed on the GitHub calendar, as of {now:%Y-%m-%d %H:%M UTC}. Current streak includes yesterday while today is in progress.</desc>
 <style>
@@ -166,7 +177,7 @@ def render_streak_svg(calendar, now):
 <text x="24" y="23" class="dim tiny">GITHUB ACTIVITY / PAST YEAR</text>
 <text x="1016" y="23" text-anchor="end" class="dim tiny">UTC</text>
 <g transform="translate(24 36)">{streak_card(calendar, now.date())}</g>
-</svg>'''
+</svg>''', theme)
 
 
 def event_phrase(kind, count):
@@ -194,6 +205,10 @@ class ContributionParser(HTMLParser):
         self.days = {}
         self.heading = []
         self.in_heading = False
+        self.counts = {}
+        self.cell_dates = {}
+        self.tooltip = None
+        self.tooltip_text = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
@@ -203,16 +218,29 @@ class ContributionParser(HTMLParser):
             if level not in range(5):
                 raise ValueError('Unexpected contribution level')
             self.days[day] = level
+            if attrs.get('id'):
+                self.cell_dates[attrs['id']] = day
+        if tag == 'tool-tip':
+            self.tooltip = attrs.get('for')
+            self.tooltip_text = []
         if tag == 'h2' and attrs.get('id') == 'js-contribution-activity-description':
             self.in_heading = True
 
     def handle_endtag(self, tag):
         if tag == 'h2':
             self.in_heading = False
+        if tag == 'tool-tip' and self.tooltip:
+            day = self.cell_dates.get(self.tooltip)
+            match = re.search(r'(No|[\d,]+) contributions?\s+on\b', ''.join(self.tooltip_text))
+            if day is not None and match:
+                self.counts[day] = 0 if match[1] == 'No' else int(match[1].replace(',', ''))
+            self.tooltip = None
 
     def handle_data(self, data):
         if self.in_heading:
             self.heading.append(data)
+        if self.tooltip:
+            self.tooltip_text.append(data)
 
     @property
     def total(self):
@@ -220,6 +248,91 @@ class ContributionParser(HTMLParser):
         if not match or len(self.days) < 350:
             raise ValueError('GitHub calendar markup changed or data is incomplete; keeping previous SVG')
         return int(match.group(1).replace(',', ''))
+
+
+class ContributionCalendar:
+    def __init__(self, days, counts, total, source):
+        self.days, self.counts, self.total, self.source = days, counts, total, source
+
+
+def calendar_from_graphql(data, today):
+    """Reject partial/error responses rather than publishing a zero-filled chart."""
+    if data.get('errors'):
+        raise ValueError('GitHub GraphQL returned errors; keeping the previous snapshot')
+    try:
+        raw = data['data']['user']['contributionsCollection']['contributionCalendar']
+        days, counts = {}, {}
+        levels = {'NONE': 0, 'FIRST_QUARTILE': 1, 'SECOND_QUARTILE': 2,
+                  'THIRD_QUARTILE': 3, 'FOURTH_QUARTILE': 4}
+        for week in raw['weeks']:
+            for item in week['contributionDays']:
+                day = date.fromisoformat(item['date'])
+                if today - timedelta(days=364) <= day <= today:
+                    if day in days:
+                        raise ValueError('Duplicate contribution date')
+                    days[day] = levels[item['contributionLevel']]
+                    counts[day] = item['contributionCount']
+        calendar = ContributionCalendar(days, counts, raw['totalContributions'], 'github-graphql')
+        validate_calendar(calendar, today)
+        return calendar
+    except (KeyError, TypeError) as error:
+        raise ValueError('Incomplete GitHub GraphQL contribution data') from error
+
+
+def validate_calendar(calendar, today):
+    expected = {today - timedelta(days=i) for i in range(365)}
+    if set(calendar.days) != expected or set(calendar.counts) != expected:
+        raise ValueError('Incomplete 365-day contribution calendar; keeping previous output')
+    for day in expected:
+        count, level = calendar.counts[day], calendar.days[day]
+        if (type(count) is not int or count < 0 or type(level) is not int or level not in range(5)
+                or (count == 0) != (level == 0)):
+            raise ValueError('Invalid contribution count or level')
+    if type(calendar.total) is not int or sum(calendar.counts.values()) != calendar.total:
+        raise ValueError('Contribution total does not match the daily counts')
+
+
+def contribution_calendar(username, now):
+    today = now.date()
+    start = today - timedelta(days=364)
+    if os.environ.get('GITHUB_TOKEN'):
+        query = '''query($login:String!,$from:DateTime!,$to:DateTime!){
+          user(login:$login){contributionsCollection(from:$from,to:$to){
+            contributionCalendar{totalContributions weeks{contributionDays{
+              date contributionCount contributionLevel
+            }}}
+          }}
+        }'''
+        try:
+            data = json.loads(fetch('https://api.github.com/graphql', {
+                'query': query, 'variables': {'login': username,
+                    'from': f'{start}T00:00:00Z', 'to': now.isoformat().replace('+00:00', 'Z')}}))
+        except HTTPError as error:
+            if error.code != 403:
+                raise
+            with error:
+                message = json.loads(error.read()).get('message', '')
+            if 'resource not accessible by integration' not in message.lower():
+                raise
+            data = {'errors': [{'type': 'FORBIDDEN', 'message': message}]}
+        errors = data.get('errors', [])
+        denied_to_integration = errors and all(
+            error.get('type') == 'FORBIDDEN'
+            and 'integration' in error.get('message', '').lower() for error in errors)
+        if not denied_to_integration:
+            return calendar_from_graphql(data, today)
+        # Some workflow tokens cannot read account-level contributions. Real public
+        # counts are still available without asking the owner for a broader token.
+        print('Workflow token cannot read GraphQL contributions; validating the public calendar instead.')
+    # Record the fallback source; never approximate counts from heatmap intensity.
+    parsed = ContributionParser()
+    parsed.feed(fetch(f'https://github.com/users/{username}/contributions?from={start}&to={today}'))
+    _ = parsed.total
+    days = {day: level for day, level in parsed.days.items() if start <= day <= today}
+    counts = {day: count for day, count in parsed.counts.items() if start <= day <= today}
+    calendar = ContributionCalendar(days, counts, sum(counts.values()), 'github-public-calendar')
+    validate_calendar(calendar, today)
+    return calendar
 
 
 def summary(repos):
@@ -247,7 +360,7 @@ def contribution_cells(calendar, today):
     return cells
 
 
-def render(profile, repos, calendar, now, events=None):
+def render(profile, repos, calendar, now, events=None, theme='dark'):
     info = summary(repos)
     login = profile['login']
     name = profile.get('name') or login
@@ -297,8 +410,10 @@ def render(profile, repos, calendar, now, events=None):
         svg.append(f'<text x="{x}" y="{y}" class="{cls}" {extra}>{escape(str(value))}</text>')
 
     def panel(x, y, width, height, title, delay=0, active=False):
-        svg.append(f'<g class="enter" style="--delay:{delay}s"><rect x="{x}" y="{y}" width="{width}" height="{height}" rx="4" fill="#131519" stroke="{"#6c5c3e" if active else "#363b43"}"/>')
-        svg.append(f'<rect x="{x + 12}" y="{y - 10}" width="{len(title) * 7.9 + 20:.1f}" height="20" fill="#101114"/>')
+        # Leave a real gap in the top border; an opaque title mask would mismatch Dimmed.
+        gap = len(title) * 7.9 + 32
+        svg.append(f'<g class="enter" style="--delay:{delay}s"><rect x="{x}" y="{y}" width="{width}" height="{height}" rx="4" fill="#131519"/>')
+        svg.append(f'<path d="M{x + 12} {y}H{x}V{y + height}H{x + width}V{y}H{x + gap}" fill="none" stroke="{"#6c5c3e" if active else "#363b43"}"/>')
         text(x + 22, y + 4, title, 'accent small' if active else 'bright small')
 
     svg.append(f'<desc id="desc">{escape(name)} (@{escape(login)}). {len(repos)} public repositories, {profile["followers"]} followers, {total} contributions. Account age {age} days. Contribution calendar shows actual profile activity levels. Synced {now:%Y-%m-%d %H:%M UTC}.</desc>')
@@ -409,31 +524,111 @@ def render(profile, repos, calendar, now, events=None):
     text(28, 1335, f'LAST SYNC {now:%Y-%m-%d %H:%M UTC}', 'dim tiny')
     text(1012, 1335, 'PUBLIC DATA / REFRESH ~1H', 'dim tiny', 'text-anchor="end"')
     svg.append('<rect x="16" y="60" width="1008" height="1244" fill="url(#scan)" pointer-events="none"/>\n</svg>\n')
-    return ''.join(svg)
+    return apply_theme(''.join(svg), theme)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--username', default='vanhhoang')
-    parser.add_argument('--output', type=Path, default=ROOT / 'assets/header.svg')
+    parser.add_argument('--output-dir', type=Path, default=ROOT / 'assets')
+    parser.add_argument('--readme', type=Path, default=ROOT / 'README.md')
+    parser.add_argument('--from-snapshot', type=Path,
+                        help='Render saved real data offline, preserving its original sync timestamp')
     args = parser.parse_args()
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9-]{0,38}', args.username):
         parser.error('Invalid GitHub username')
-    profile = json.loads(fetch(f'https://api.github.com/users/{args.username}'))
-    repos = repositories(args.username)
-    calendar = ContributionParser()
-    calendar.feed(fetch(f'https://github.com/users/{args.username}/contributions'))
-    _ = calendar.total
-    events = public_events(args.username)
-    now = datetime.now(timezone.utc)
-    result = render(profile, repos, calendar, now, events)
-    card = render_streak_svg(calendar, now)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    for output, content in ((args.output, result), (args.output.parent / 'streak.svg', card)):
-        temporary = output.with_suffix('.svg.tmp')
+    if args.from_snapshot:
+        snapshot = json.loads(args.from_snapshot.read_text(encoding='utf-8'))
+    else:
+        now = datetime.now(timezone.utc)
+        person = json.loads(fetch(f'https://api.github.com/users/{args.username}'))
+        repos = repositories(args.username)
+        calendar = contribution_calendar(args.username, now)
+        events = public_events(args.username)
+        snapshot = make_snapshot(person, repos, calendar, events, now)
+    person, repos, calendar, events, now = unpack_snapshot(snapshot)
+    if person['login'].lower() != args.username.lower():
+        raise ValueError('Snapshot belongs to a different GitHub user')
+    # Compute every artifact before touching any previously successful output.
+    files = build_outputs(person, repos, calendar, events, now)
+    files['profile-data.json'] = json.dumps(snapshot, ensure_ascii=False, indent=2) + '\n'
+    readme = files.pop('README.md')
+    outputs = [(args.output_dir / name, content) for name, content in files.items()]
+    outputs.append((args.readme, readme))
+    for output, content in outputs:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_name(output.name + '.tmp')
         temporary.write_text(content, encoding='utf-8')
         temporary.replace(output)
-    print(f'Updated {args.output}: {len(repos)} public repos, {calendar.total} profile contributions')
+    mode = 'Re-rendered saved' if args.from_snapshot else 'Fetched live'
+    print(f'{mode} data ({now:%Y-%m-%d %H:%M UTC}, {calendar.source}): '
+          f'{len(repos)} public repos, {calendar.total} contributions; '
+          f'updated README and {len(files) - 1} SVGs')
+
+
+def make_snapshot(person, repos, calendar, events, now):
+    return {'schema_version': 1, 'fetched_at': now.isoformat(),
+            'profile': {key: person[key] for key in ('login', 'name', 'bio', 'created_at',
+                                                   'followers', 'following', 'public_gists')},
+            'repositories': [{key: repo[key] for key in
+                              ('id', 'name', 'fork', 'language', 'stargazers_count')}
+                             for repo in repos],
+            'events': [{key: event[key] for key in ('id', 'type', 'created_at', 'public')}
+                       for event in events],
+            'calendar': {'source': calendar.source, 'total': calendar.total,
+                         'days': [{'date': str(day), 'level': calendar.days[day],
+                                   'count': calendar.counts[day]}
+                                  for day in sorted(calendar.days)]}}
+
+
+def unpack_snapshot(snapshot):
+    if snapshot.get('schema_version') != 1:
+        raise ValueError('Unsupported snapshot version')
+    now = datetime.fromisoformat(snapshot['fetched_at'].replace('Z', '+00:00'))
+    if now.utcoffset() != timedelta(0):
+        raise ValueError('Snapshot timestamp must be UTC')
+    person, repos, events = snapshot['profile'], snapshot['repositories'], snapshot['events']
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9-]{0,38}', person['login']):
+        raise ValueError('Invalid snapshot login')
+    for key in ('followers', 'following', 'public_gists'):
+        if type(person[key]) is not int or person[key] < 0:
+            raise ValueError('Invalid account statistic')
+    for repo in repos:
+        if (type(repo['fork']) is not bool or type(repo['stargazers_count']) is not int
+                or repo['stargazers_count'] < 0):
+            raise ValueError('Invalid repository statistic')
+    raw = snapshot['calendar']
+    if raw['source'] not in ('github-graphql', 'github-public-calendar'):
+        raise ValueError('Unknown contribution source')
+    days, counts = {}, {}
+    for item in raw['days']:
+        day = date.fromisoformat(item['date'])
+        if day in days:
+            raise ValueError('Duplicate contribution date in snapshot')
+        days[day], counts[day] = item['level'], item['count']
+    calendar = ContributionCalendar(days, counts, raw['total'], raw['source'])
+    validate_calendar(calendar, now.date())
+    return person, repos, calendar, events, now
+
+
+def build_outputs(person, repos, calendar, events, now):
+    import xml.etree.ElementTree as ET
+    info, activity = summary(repos), activity_summary(events, now)
+    activity['capped'] = len(events) >= 300
+    files = {}
+    for theme in ('dark', 'light'):
+        charts = render_charts(info, activity, calendar, now, theme)
+        charts['header'] = render(person, repos, calendar, now, events, theme)
+        charts['streak'] = render_streak_svg(calendar, now, theme)
+        for name, content in charts.items():
+            # Broken markup should never replace a usable chart.
+            ET.fromstring(content)
+            files[f'{name}-{theme}.svg'] = content
+    # Retain existing asset URLs for anyone already linking to them.
+    files['header.svg'] = files['header-dark.svg']
+    files['streak.svg'] = files['streak-dark.svg']
+    files['README.md'] = render_readme(person)
+    return files
 
 
 if __name__ == '__main__':

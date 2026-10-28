@@ -1,3 +1,5 @@
 __pycache__/
 *.py[cod]
 *.svg.tmp
+*.json.tmp
+README.md.tmp
