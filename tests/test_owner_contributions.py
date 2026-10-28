@@ -105,7 +105,7 @@ class OwnerContributionTests(unittest.TestCase):
 
     @patch.dict(os.environ, {'PROFILE_TOKEN': 'owner-test-token'}, clear=True)
     @patch.object(profile, 'fetch')
-    def test_private_profile_uses_owner_counts_and_does_not_save_private_user_fields(self, fetch):
+    def test_private_profile_does_not_save_hidden_counters_or_private_user_fields(self, fetch):
         fetch.return_value = json.dumps({**PERSON, 'followers': 27, 'following': 43,
                                         'email': 'private@example.test', 'total_private_repos': 19})
         person = profile.account_profile('example')
@@ -113,7 +113,8 @@ class OwnerContributionTests(unittest.TestCase):
         self.assertEqual(person['followers'], 27)
         self.assertEqual(person['following'], 43)
         snapshot = profile.make_snapshot(person, REPOS, calendar_fixture(), EVENTS, NOW)
-        self.assertEqual(snapshot['profile']['followers'], 27)
+        for key in ('followers', 'following', 'public_gists'):
+            self.assertNotIn(key, snapshot['profile'])
         self.assertNotIn('email', snapshot['profile'])
         self.assertNotIn('total_private_repos', snapshot['profile'])
 

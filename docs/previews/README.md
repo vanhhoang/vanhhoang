@@ -4,7 +4,7 @@
 
 ![Light, Dark and Dark dimmed previews of the same real-data charts](theme-matrix.png)
 
-The left column uses the light SVG palette. Both dark columns use exactly the same dark SVG files; the different backgrounds remain visible through them. These are rasterized chart previews, not screenshots of GitHub's README renderer. The public README retains the full six-pane animated terminal, using the same transparent background and light/dark palettes.
+The left column uses the light SVG palette. Both dark columns use exactly the same dark SVG files; the different backgrounds remain visible through them. These are rasterized chart previews, not screenshots of GitHub's README renderer. The public README retains the five-pane animated terminal, using the same transparent background and light/dark palettes.
 
 The snapshot timestamp is printed at the bottom of the preview. It is preserved when regenerating offline. Preview PNGs are review artifacts and do not refresh hourly; the profile SVGs and saved JSON do.
 
@@ -25,6 +25,6 @@ The snapshot timestamp is printed at the bottom of the preview. It is preserved 
 - [Dark SVG](../../assets/streak-dark.svg)
 - [Light SVG](../../assets/streak-light.svg)
 
-The six-pane terminal retains entrance, bar-growth, typewriter, cursor and streak-ring animations. Reduced-motion preferences disable the animations. Layout inspiration: [btop](https://github.com/aristocratos/btop).
+The five-pane terminal retains entrance, bar-growth, typewriter, cursor and streak-ring animations. Reduced-motion preferences disable the animations. Layout inspiration: [btop](https://github.com/aristocratos/btop).
 
 See [data definitions and maintenance](../design.md) for API sources, hourly scheduling, theme limitations, and local commands.

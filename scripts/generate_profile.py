@@ -425,11 +425,11 @@ def render(profile, repos, calendar, now, events=None, theme='dark'):
     contributions = contribution_summary(calendar, today)
     activity = activity_summary(events or [], now)
     age = (today - date.fromisoformat(profile['created_at'][:10])).days
-    svg = ['''<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1350" viewBox="0 0 1040 1350" role="img" aria-labelledby="title desc">
+    svg = ['''<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="1312" viewBox="0 0 1040 1312" role="img" aria-labelledby="title desc">
 <title id="title">GitHub personal terminal — TUI edition</title>
 <defs>
   <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse"><path d="M0 3.5H4" stroke="#000" stroke-opacity=".045"/></pattern>
-  <clipPath id="screen"><rect x="16" y="60" width="1008" height="1244"/></clipPath>
+  <clipPath id="screen"><rect x="16" y="60" width="1008" height="1206"/></clipPath>
   <clipPath id="typing"><rect class="draw" width="__TYPE_WIDTH__" height="24" style="animation:draw 1.2s steps(__TYPE_COUNT__,end) 2.4s both"/></clipPath>
 </defs>
 <style>
@@ -455,7 +455,7 @@ def render(profile, repos, calendar, now, events=None, theme='dark'):
     .moving-command{display:none;} .static-command{display:inline;}
   }
 </style>
-<rect x="1" y="1" width="1038" height="1348" rx="5" fill="#101114" stroke="#363b43"/>
+<rect x="1" y="1" width="1038" height="1310" rx="5" fill="#101114" stroke="#363b43"/>
 <rect x="16" y="16" width="1008" height="34" rx="2" fill="#202228"/>
 <text x="30" y="38" class="bright small">[ TTY 01 ]  PERSONAL TERMINAL</text>
 <text x="1010" y="38" text-anchor="end" class="dim small">GITHUB / PUBLIC PROFILE</text>
@@ -472,28 +472,21 @@ def render(profile, repos, calendar, now, events=None, theme='dark'):
         svg.append(f'<path d="M{x + 12} {y}H{x}V{y + height}H{x + width}V{y}H{x + gap}" fill="none" stroke="{"#6c5c3e" if active else "#363b43"}"/>')
         text(x + 22, y + 4, title, 'accent small' if active else 'bright small')
 
-    svg.append(f'<desc id="desc">{escape(name)} (@{escape(login)}). {len(repos)} public repositories, {profile["followers"]} followers, {total} contributions. Account age {age} days. Contribution calendar shows actual profile activity levels. Synced {now:%Y-%m-%d %H:%M UTC}.</desc>')
+    svg.append(f'<desc id="desc">{escape(name)} (@{escape(login)}). {total} contributions. Account age {age} days. Contribution calendar shows actual profile activity levels. Synced {now:%Y-%m-%d %H:%M UTC}.</desc>')
 
-    panel(24, 96, 380, 218, '01 / PROFILE', .05, True)
+    panel(24, 96, 992, 180, '01 / PROFILE', .05, True)
     text(46, 150, name[:18].upper(), 'bright', 'style="font-size:35px;font-weight:700;letter-spacing:3px"')
     text(46, 181, f'@{login}', 'accent')
     text(46, 212, f'SINCE {profile["created_at"][:10]} / {age:,} DAYS', 'dim small')
     bio = profile.get('bio') or 'Ideas, experiments, and things I make along the way.'
-    for i, row in enumerate(textwrap.wrap(bio, width=36)[:3]):
-        text(46, 247 + i * 22, row, '', 'style="font-size:14px"')
+    text(448, 143, 'ABOUT', 'dim label')
+    for i, row in enumerate(textwrap.wrap(bio, width=62)[:4]):
+        text(448, 177 + i * 22, row, '', 'style="font-size:14px"')
     svg.append('</g>')
 
-    panel(424, 96, 592, 218, '02 / GITHUB PULSE', .15)
-    metrics = [('PUBLIC REPOS', len(repos)), ('FOLLOWERS', profile['followers']),
-               ('STARS RECEIVED', info['stars']), ('FOLLOWING', profile['following'])]
-    for i, (label, value) in enumerate(metrics):
-        x, y = 448 + (i % 2) * 284, 133 + (i // 2) * 79
-        text(x, y, label, 'dim label')
-        text(x, y + 35, f'{value:,}', 'accent' if i in (0, 2) else 'bright', 'style="font-size:30px;font-weight:700"')
-    text(448, 292, f'{info["originals"]} originals / {info["forks"]} forks / {profile["public_gists"]} public gists', 'dim small')
-    svg.append('</g>')
-
-    panel(24, 340, 592, 254, '03 / ACTIVITY', .3)
+    # Compact the remaining panes after removing the GitHub Pulse counters.
+    svg.append('<g transform="translate(0 -38)">')
+    panel(24, 340, 592, 254, '02 / ACTIVITY', .3)
     text(46, 384, f'{activity["total"]} public events' if events is not None else 'Activity unavailable', 'accent')
     text(592, 384, '14-DAY CHART / UTC', 'dim tiny', 'text-anchor="end"')
     dates = [today - timedelta(days=i) for i in reversed(range(14))]
@@ -511,7 +504,7 @@ def render(profile, repos, calendar, now, events=None, theme='dark'):
     text(592, 582, 'COUNTS: AVAILABLE 30-DAY WINDOW', 'dim tiny', 'text-anchor="end"')
     svg.append('</g>')
 
-    panel(636, 340, 380, 254, '04 / LANGUAGE MIX', .45)
+    panel(636, 340, 380, 254, '03 / LANGUAGE MIX', .45)
     languages = info['languages']
     groups = languages.most_common(3)
     if len(languages) > 3:
@@ -528,7 +521,7 @@ def render(profile, repos, calendar, now, events=None, theme='dark'):
     text(658, 578, 'PRIMARY LANGUAGE / ORIGINAL REPOS', 'dim tiny')
     svg.append('</g>')
 
-    panel(24, 620, 992, 412, '05 / CONTRIBUTIONS', .6)
+    panel(24, 620, 992, 412, '04 / CONTRIBUTIONS', .6)
     owner_view = getattr(calendar, 'visibility', 'viewer-limited') == 'owner-authenticated'
     text(994, 648, 'PAST YEAR / UTC' if owner_view else 'LIMITED VIEW / UTC', 'dim tiny', 'text-anchor="end"')
     svg.append('<g transform="translate(24 650)">' + streak_card(calendar, today) + '</g>')
@@ -553,7 +546,7 @@ def render(profile, repos, calendar, now, events=None, theme='dark'):
     text(994, 1011, 'MORE', 'dim tiny', 'text-anchor="end"')
     svg.append('</g>')
 
-    panel(24, 1058, 992, 218, '06 / TIMELINE', .8)
+    panel(24, 1058, 992, 218, '05 / TIMELINE', .8)
     days = sorted(activity['log'], reverse=True)[:4]
     if days:
         svg.append(f'<path d="M55 1102V{1102 + (len(days) - 1) * 38}" stroke="#4b515b" stroke-width="1.5"/>')
@@ -582,7 +575,7 @@ def render(profile, repos, calendar, now, events=None, theme='dark'):
     svg.append('<rect x="16" y="1323" width="1008" height="16" fill="#202228"/>')
     text(28, 1335, f'LAST SYNC {now:%Y-%m-%d %H:%M UTC}', 'dim tiny')
     text(1012, 1335, 'GITHUB DATA / REFRESH ~1H', 'dim tiny', 'text-anchor="end"')
-    svg.append('<rect x="16" y="60" width="1008" height="1244" fill="url(#scan)" pointer-events="none"/>\n</svg>\n')
+    svg.append('</g><rect x="16" y="60" width="1008" height="1206" fill="url(#scan)" pointer-events="none"/>\n</svg>\n')
     return apply_theme(''.join(svg), theme)
 
 
@@ -633,8 +626,7 @@ def main():
 
 def make_snapshot(person, repos, calendar, events, now):
     return {'schema_version': 1, 'fetched_at': now.isoformat(),
-            'profile': {key: person[key] for key in ('login', 'name', 'bio', 'created_at',
-                                                   'followers', 'following', 'public_gists')},
+            'profile': {key: person[key] for key in ('login', 'name', 'bio', 'created_at')},
             'repositories': [{key: repo[key] for key in
                               ('id', 'name', 'fork', 'language', 'stargazers_count')}
                              for repo in repos],
@@ -658,7 +650,7 @@ def unpack_snapshot(snapshot):
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9-]{0,38}', person['login']):
         raise ValueError('Invalid snapshot login')
     for key in ('followers', 'following', 'public_gists'):
-        if type(person[key]) is not int or person[key] < 0:
+        if key in person and (type(person[key]) is not int or person[key] < 0):
             raise ValueError('Invalid account statistic')
     for repo in repos:
         if (type(repo['fork']) is not bool or type(repo['stargazers_count']) is not int

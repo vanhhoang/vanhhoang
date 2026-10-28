@@ -1,8 +1,10 @@
 # Theme-aware terminal profile
 
-The README preserves the original animated six-pane terminal: Profile, GitHub Pulse, Activity, Language Mix, Contributions, and Timeline. It embeds a single full-width dashboard for the visitor's light/dark mode, followed by the original Repositories, Activity and Stars navigation. The SVG background is transparent; neutral panel fills and borders use low opacity rather than a fixed page color, allowing GitHub's Light, Dark and Dark dimmed backgrounds to show through.
+The README preserves the animated five-pane terminal: Profile, Activity, Language Mix, Contributions, and Timeline. It embeds a single full-width dashboard for the visitor's light/dark mode, followed by the original Repositories, Activity and Stars navigation. The SVG background is transparent; neutral panel fills and borders use low opacity rather than a fixed page color, allowing GitHub's Light, Dark and Dark dimmed backgrounds to show through.
 
 The two dashboard palettes are selected with GitHub's `#gh-dark-mode-only` and `#gh-light-mode-only` fragments on explicit image links. The dark palette is designed to remain readable on both Dark and Dark dimmed. The SVG does not detect every named theme or inherit GitHub CSS variables; its typography and chart colors retain the selected light/dark palette. Counts and text labels make meaning available without relying only on hue. Public names and bios are escaped as text.
+
+The Profile pane now spans the full width, with identity on the left and the existing bio on the right. GitHub Pulse has been removed, including its repository, star, follower/following and gist counters. Those follower/following/gist fields are also removed from the generated public snapshot, and repository/follower totals are omitted from the SVG description. The remaining panes are moved up and renumbered.
 
 The dashboard is generated as `assets/header-dark.svg` and `assets/header-light.svg`, with `assets/header.svg` preserving its previous URL. Standalone charts and animated streak cards remain available in both palettes for reuse and [preview](previews/README.md). Maintenance notes stay in this document instead of expanding the public profile into a separate report.
 
@@ -12,9 +14,8 @@ All published values come from GitHub. No sample values are used when refreshing
 
 | Display | Source / definition |
 | --- | --- |
-| Identity, joined date, followers, following, public gists | Authenticated `GET /user` with the owner's `PROFILE_TOKEN`, verifying the returned login. This preserves owner-visible follower/following counts when profile privacy hides them from the public endpoint. Only local previews without an owner token use `GET /users/{login}`. Account age uses the UTC snapshot date; an empty bio uses a general welcome message. |
-| Owned public repositories, originals, forks | `GET /users/{login}/repos?type=owner&per_page=100&page=N`; fetch every page. Archived repositories remain included. |
-| Stars received | Sum of `stargazers_count` on original owned public repositories; forks excluded. Starring someone else's repository is an outgoing activity event and does not increase this total. |
+| Identity and joined date | Authenticated `GET /user` with the owner's `PROFILE_TOKEN`, verifying the returned login. Only login, name, bio and created_at are retained in the public snapshot. Local previews without an owner token use `GET /users/{login}`. Account age uses the UTC snapshot date; an empty bio uses a general welcome message. |
+| Repository data for language mix | `GET /users/{login}/repos?type=owner&per_page=100&page=N`; fetch every page. Archived repositories remain included. No GitHub Pulse counter panel is rendered. |
 | Language mix | Each original public repository contributes one count for its primary `language`. Forks and unclassified repositories are excluded. This measures repository share, not code bytes, expertise or coding time. |
 | Contributions / heatmap | GraphQL `user.contributionsCollection(from:, to:).contributionCalendar`: exact `contributionCount`, `contributionLevel`, and `totalContributions`, using the owner's `PROFILE_TOKEN` with `read:user` scope. The query requests today and the preceding 364 UTC dates, and verifies `viewer.login` matches the profile owner. Only aggregate daily counts/levels are requested; private repository names and commit details are never queried. |
 | Limited preview | Local runs without `--require-owner-calendar` may use the workflow token or public HTML calendar. These are explicitly marked `viewer-limited` and rendered as Visible Contributions / LIMITED VIEW. The production workflow requires owner authentication and never falls back to these sources. |
@@ -78,4 +79,6 @@ Charts use a short fade animation. The supplemental terminal retains its entranc
 - [Public events and their limits](https://docs.github.com/en/rest/activity/events)
 - [Scheduled workflow behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
 
-GitHub documents that private-profile follower/following values can differ between unauthenticated requests and the owner's authenticated response: [Get the authenticated user](https://docs.github.com/en/rest/users/users#get-the-authenticated-user). Reading these counters uses the existing `read:user` token; the application does not perform follow/unfollow actions.
+## Proposed achievement placement
+
+If achievements are added later, place a compact full-width row immediately after Profile and before the Activity / Language Mix row. Show three to five earned badges with names and links, using transparent backgrounds and the existing typography. This position groups achievements with identity without bringing back the removed social counters. No achievement placeholders or unverified badges are currently rendered.

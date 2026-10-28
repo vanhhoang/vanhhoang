@@ -154,7 +154,7 @@ class DynamicProfileTests(unittest.TestCase):
         self.assertEqual(now, NOW)
         self.assertEqual(calendar.counts, calendar_fixture().counts)
         self.assertNotIn('token', json.dumps(snapshot))
-        self.assertEqual(person, PERSON)
+        self.assertEqual(person, {key: PERSON[key] for key in ('login', 'name', 'bio', 'created_at')})
         self.assertEqual(repos, REPOS)
         self.assertEqual(events, EVENTS)
 

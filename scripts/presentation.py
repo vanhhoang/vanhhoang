@@ -145,7 +145,7 @@ def render_readme(person):
     """Keep the original single-terminal layout; only its palette changes by theme."""
     login = person['login']
     name = person.get('name') or login
-    alt = escape(f'{name} (@{login}) — personal terminal with GitHub counters, activity, '
+    alt = escape(f'{name} (@{login}) — personal terminal with profile, activity, '
                  'languages, contributions, streaks and timeline. Last sync appears in the status bar.', quote=True)
     return f'''<p align="center">
   <a href="assets/header-dark.svg#gh-dark-mode-only">

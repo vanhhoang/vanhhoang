@@ -10,7 +10,7 @@ Mở [Personal access token (classic)](https://github.com/settings/tokens/new) k
 2. Chọn scope **read:user**.
 3. Chọn **Generate token** và sao chép giá trị để lưu vào secret ở bước tiếp theo.
 
-Quyền `read:user` được GitHub nêu cho contributions trong private/internal repositories ở [ContributionsCollection](https://docs.github.com/en/graphql/reference/users#contributionscollection). Token này dùng cho truy vấn GraphQL tổng hợp contributions và đọc thông tin tài khoản qua `GET /user`, gồm số followers/following khi profile đang private. Không gửi giá trị token vào chat hoặc ghi vào code.
+Quyền `read:user` được GitHub nêu cho contributions trong private/internal repositories ở [ContributionsCollection](https://docs.github.com/en/graphql/reference/users#contributionscollection). Token này dùng cho truy vấn GraphQL tổng hợp contributions và đọc thông tin tài khoản qua `GET /user`, để đọc tên, bio và ngày tham gia. Không gửi giá trị token vào chat hoặc ghi vào code.
 
 ## 2. Thêm repository secret
 
@@ -20,7 +20,7 @@ Mở [New repository secret](https://github.com/vanhhoang/vanhhoang/settings/sec
 - **Secret:** giá trị token vừa tạo.
 - Chọn **Add secret**.
 
-Dashboard sẽ xuất bản số lượng contributions theo ngày trong ảnh README. Không truy vấn tên hoặc nội dung repository private. Token mặc định `GITHUB_TOKEN` vẫn dùng cho thông tin công khai và commit kết quả; `PROFILE_TOKEN` đọc contributions và thông tin của chính tài khoản. Giữ scope `read:user`; không cần thêm `user:follow` để hiển thị hai chỉ số followers/following.
+Dashboard sẽ xuất bản số lượng contributions theo ngày trong ảnh README. Không truy vấn tên hoặc nội dung repository private. Token mặc định `GITHUB_TOKEN` vẫn dùng cho thông tin công khai và commit kết quả; `PROFILE_TOKEN` đọc contributions và thông tin của chính tài khoản. Giữ scope `read:user`. Khung GitHub Pulse đã được bỏ; followers, following và public_gists cũng không được lưu trong snapshot mới.
 
 ## 3. Đẩy commit đã chuẩn bị
 
