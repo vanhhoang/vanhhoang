@@ -12,7 +12,7 @@ All published values come from GitHub. No sample values are used when refreshing
 
 | Display | Source / definition |
 | --- | --- |
-| Identity, joined date, followers, following, public gists | `GET /users/{login}`. Account age is calculated at the UTC snapshot date. An empty bio uses a general welcome message, without inventing a job title or employer. |
+| Identity, joined date, followers, following, public gists | Authenticated `GET /user` with the owner's `PROFILE_TOKEN`, verifying the returned login. This preserves owner-visible follower/following counts when profile privacy hides them from the public endpoint. Only local previews without an owner token use `GET /users/{login}`. Account age uses the UTC snapshot date; an empty bio uses a general welcome message. |
 | Owned public repositories, originals, forks | `GET /users/{login}/repos?type=owner&per_page=100&page=N`; fetch every page. Archived repositories remain included. |
 | Stars received | Sum of `stargazers_count` on original owned public repositories; forks excluded. Starring someone else's repository is an outgoing activity event and does not increase this total. |
 | Language mix | Each original public repository contributes one count for its primary `language`. Forks and unclassified repositories are excluded. This measures repository share, not code bytes, expertise or coding time. |
@@ -42,7 +42,7 @@ The snapshot is also a reproducible offline input. Offline regeneration keeps it
 
 `.github/workflows/update-profile.yml` runs at minute 17 of every hour, on relevant source/test/workflow pushes to main/master, and through **Actions → Refresh terminal profile → Run workflow**. It checks out the latest default branch, runs the regression suite, fetches real GitHub data, and commits the generated README, JSON and SVGs if they changed. Generated-only commits do not trigger this workflow again.
 
-The built-in `GITHUB_TOKEN` remains responsible for public REST data and the checkout's commit/push authentication. The separate repository secret `PROFILE_TOKEN` is used only for the aggregate GraphQL contribution query. Both arrive through the environment; credentials are never serialized. The workflow passes `--require-owner-calendar`, so a missing, invalid, wrong-owner or insufficiently scoped token fails the refresh before output is replaced. A calendar returned to a workflow token can contain only a small subset of the owner-visible data even when its response is well-formed. See [setup instructions](PUBLISH.md).
+The built-in `GITHUB_TOKEN` remains responsible for public REST data and the checkout's commit/push authentication. The separate repository secret `PROFILE_TOKEN` is used only for the aggregate GraphQL contribution query and authenticated `GET /user`. Only the selected profile fields are saved; private response fields such as email and private repository totals are discarded. Both arrive through the environment; credentials are never serialized. The workflow passes `--require-owner-calendar`, so a missing, invalid, wrong-owner or insufficiently scoped token fails the refresh before output is replaced. A calendar returned to a workflow token can contain only a small subset of the owner-visible data even when its response is well-formed. See [setup instructions](PUBLISH.md).
 
 This is an hourly snapshot, not a live socket. Scheduling and GitHub image caching can delay what visitors see. Public-repository schedules can be disabled after 60 days without repository activity; re-enable or manually run the workflow if needed. Publishing the modified workflow to the repository's default branch is necessary before it can run.
 
@@ -77,3 +77,5 @@ Charts use a short fade animation. The supplemental terminal retains its entranc
 - [Public calendar fallback](https://github.com/users/vanhhoang/contributions)
 - [Public events and their limits](https://docs.github.com/en/rest/activity/events)
 - [Scheduled workflow behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+
+GitHub documents that private-profile follower/following values can differ between unauthenticated requests and the owner's authenticated response: [Get the authenticated user](https://docs.github.com/en/rest/users/users#get-the-authenticated-user). Reading these counters uses the existing `read:user` token; the application does not perform follow/unfollow actions.

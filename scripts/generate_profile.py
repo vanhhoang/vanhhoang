@@ -27,7 +27,7 @@ def fetch(url, payload=None):
     headers = {'User-Agent': 'github-terminal-profile', 'Accept': 'application/vnd.github+json'}
     if url.startswith('https://api.github.com/'):
         token = os.environ.get('GITHUB_TOKEN')
-        if url == 'https://api.github.com/graphql':
+        if url in ('https://api.github.com/graphql', 'https://api.github.com/user'):
             token = os.environ.get('PROFILE_TOKEN') or token
         if token:
             headers['Authorization'] = 'Bearer ' + token
@@ -51,6 +51,16 @@ def fetch(url, payload=None):
             if attempt == 2:
                 raise
             time.sleep(2 ** attempt)
+
+
+def account_profile(username):
+    """Read owner-visible counts when profile privacy hides them from other viewers."""
+    url = ('https://api.github.com/user' if os.environ.get('PROFILE_TOKEN')
+           else f'https://api.github.com/users/{username}')
+    person = json.loads(fetch(url))
+    if str(person.get('login', '')).lower() != username.lower():
+        raise ValueError('PROFILE_TOKEN must belong to the profile owner; keeping previous output')
+    return person
 
 
 def repositories(username):
@@ -592,7 +602,7 @@ def main():
         snapshot = json.loads(args.from_snapshot.read_text(encoding='utf-8'))
     else:
         now = datetime.now(timezone.utc)
-        person = json.loads(fetch(f'https://api.github.com/users/{args.username}'))
+        person = account_profile(args.username)
         repos = repositories(args.username)
         calendar = contribution_calendar(args.username, now, require_owner=args.require_owner_calendar)
         events = public_events(args.username)
