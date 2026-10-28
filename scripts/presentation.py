@@ -107,9 +107,10 @@ def contribution_chart(calendar, now, theme):
     p = PALETTES[theme]
     first = min(calendar.days)
     start = first - timedelta(days=(first.weekday() + 1) % 7)
+    scope = 'OWNER CALENDAR' if calendar.visibility == 'owner-authenticated' else 'LIMITED CALENDAR'
     parts = ['<rect x="1" y="1" width="1038" height="218" rx="5" class="panel"/>',
              text(22, 26, f'{calendar.total:,} contributions / past 365 UTC dates', 'small'),
-             text(1018, 26, 'PUBLIC PROFILE CALENDAR', 'dim tiny', True)]
+             text(1018, 26, scope, 'dim tiny', True)]
     # Label whole weeks, so a month boundary inside the first week cannot draw
     # two month names at the same x coordinate.
     month = start.month if start.day > 21 else None

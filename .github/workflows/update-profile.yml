@@ -33,7 +33,8 @@ jobs:
       - name: Fetch GitHub APIs and render theme-aware profile
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python3 scripts/generate_profile.py --username vanhhoang
+          PROFILE_TOKEN: ${{ secrets.PROFILE_TOKEN }}
+        run: python3 scripts/generate_profile.py --username vanhhoang --require-owner-calendar
       - name: Commit refreshed profile
         run: |
           git config user.name 'github-actions[bot]'

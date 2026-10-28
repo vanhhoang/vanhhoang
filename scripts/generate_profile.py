@@ -25,8 +25,12 @@ LANGUAGE_COLORS = ['#91a6b8', '#747d89', '#555e69', '#414953']
 
 def fetch(url, payload=None):
     headers = {'User-Agent': 'github-terminal-profile', 'Accept': 'application/vnd.github+json'}
-    if url.startswith('https://api.github.com/') and os.environ.get('GITHUB_TOKEN'):
-        headers['Authorization'] = 'Bearer ' + os.environ['GITHUB_TOKEN']
+    if url.startswith('https://api.github.com/'):
+        token = os.environ.get('GITHUB_TOKEN')
+        if url == 'https://api.github.com/graphql':
+            token = os.environ.get('PROFILE_TOKEN') or token
+        if token:
+            headers['Authorization'] = 'Bearer ' + token
     body = None
     if payload is not None:
         headers['Content-Type'] = 'application/json'
@@ -34,6 +38,12 @@ def fetch(url, payload=None):
     for attempt in range(3):
         try:
             with urlopen(Request(url, data=body, headers=headers), timeout=30) as response:
+                if url == 'https://api.github.com/graphql' and os.environ.get('PROFILE_TOKEN'):
+                    scopes_header = response.headers.get('X-OAuth-Scopes')
+                    if scopes_header is not None:
+                        scopes = {scope.strip() for scope in scopes_header.split(',')}
+                        if not scopes.intersection({'read:user', 'user'}):
+                            raise ValueError('PROFILE_TOKEN needs read:user scope to include private contributions')
                 return response.read().decode('utf-8')
         except (HTTPError, URLError, TimeoutError) as error:
             if isinstance(error, HTTPError) and error.code < 500 and error.code != 429:
@@ -141,7 +151,8 @@ def streak_card(calendar, today):
         svg.append(f'<text x="{x}" y="{y}" text-anchor="middle" class="{cls}"{style}>{escape(str(value))}</text>')
 
     text(164, 75, f'{calendar.total:,}', 'bright', 31)
-    text(164, 113, 'Year Contributions', 'small')
+    owner_view = getattr(calendar, 'visibility', 'viewer-limited') == 'owner-authenticated'
+    text(164, 113, 'Year Contributions' if owner_view else 'Visible Contributions', 'small')
     text(164, 139, date_range(min(calendar.days), min(today, max(calendar.days))), 'dim tiny')
     color = '#d9b36c' if stats['current'] else '#69717e'
     svg.append('<circle cx="496" cy="66" r="42" fill="none" stroke="#2b3038" stroke-width="4"/>')
@@ -251,8 +262,10 @@ class ContributionParser(HTMLParser):
 
 
 class ContributionCalendar:
-    def __init__(self, days, counts, total, source):
+    def __init__(self, days, counts, total, source,
+                 visibility='viewer-limited', restricted_count=None):
         self.days, self.counts, self.total, self.source = days, counts, total, source
+        self.visibility, self.restricted_count = visibility, restricted_count
 
 
 def calendar_from_graphql(data, today):
@@ -260,7 +273,8 @@ def calendar_from_graphql(data, today):
     if data.get('errors'):
         raise ValueError('GitHub GraphQL returned errors; keeping the previous snapshot')
     try:
-        raw = data['data']['user']['contributionsCollection']['contributionCalendar']
+        collection = data['data']['user']['contributionsCollection']
+        raw = collection['contributionCalendar']
         days, counts = {}, {}
         levels = {'NONE': 0, 'FIRST_QUARTILE': 1, 'SECOND_QUARTILE': 2,
                   'THIRD_QUARTILE': 3, 'FOURTH_QUARTILE': 4}
@@ -272,7 +286,8 @@ def calendar_from_graphql(data, today):
                         raise ValueError('Duplicate contribution date')
                     days[day] = levels[item['contributionLevel']]
                     counts[day] = item['contributionCount']
-        calendar = ContributionCalendar(days, counts, raw['totalContributions'], 'github-graphql')
+        calendar = ContributionCalendar(days, counts, raw['totalContributions'], 'github-graphql',
+                                        restricted_count=collection.get('restrictedContributionsCount'))
         validate_calendar(calendar, today)
         return calendar
     except (KeyError, TypeError) as error:
@@ -282,7 +297,7 @@ def calendar_from_graphql(data, today):
 def validate_calendar(calendar, today):
     expected = {today - timedelta(days=i) for i in range(365)}
     if set(calendar.days) != expected or set(calendar.counts) != expected:
-        raise ValueError('Incomplete 365-day contribution calendar; keeping previous output')
+        raise ValueError('Incomplete contribution calendar; keeping previous output')
     for day in expected:
         count, level = calendar.counts[day], calendar.days[day]
         if (type(count) is not int or count < 0 or type(level) is not int or level not in range(5)
@@ -290,11 +305,42 @@ def validate_calendar(calendar, today):
             raise ValueError('Invalid contribution count or level')
     if type(calendar.total) is not int or sum(calendar.counts.values()) != calendar.total:
         raise ValueError('Contribution total does not match the daily counts')
+    if calendar.visibility not in ('owner-authenticated', 'viewer-limited'):
+        raise ValueError('Unknown contribution visibility')
+    if calendar.restricted_count is not None and (
+            type(calendar.restricted_count) is not int or not 0 <= calendar.restricted_count <= calendar.total):
+        raise ValueError('Invalid restricted contribution count')
 
 
-def contribution_calendar(username, now):
+def contribution_calendar(username, now, require_owner=False):
     today = now.date()
     start = today - timedelta(days=364)
+    if os.environ.get('PROFILE_TOKEN'):
+        # Read the owner's daily counts, including private contributions visible
+        # to that owner, for the same fixed 365-date window used by the renderer.
+        query = '''query($login:String!,$from:DateTime!,$to:DateTime!){
+          viewer{login}
+          user(login:$login){contributionsCollection(from:$from,to:$to){
+            restrictedContributionsCount
+            contributionCalendar{totalContributions weeks{contributionDays{
+              date contributionCount contributionLevel
+            }}}
+          }}
+        }'''
+        data = json.loads(fetch('https://api.github.com/graphql', {
+            'query': query, 'variables': {'login': username,
+                'from': f'{start}T00:00:00Z', 'to': now.isoformat().replace('+00:00', 'Z')}}))
+        if data.get('errors'):
+            raise ValueError('Owner contribution query failed; check PROFILE_TOKEN read:user access')
+        viewer = (data.get('data') or {}).get('viewer') or {}
+        if str(viewer.get('login', '')).lower() != username.lower():
+            raise ValueError('PROFILE_TOKEN must belong to the profile owner; keeping previous output')
+        calendar = calendar_from_graphql(data, today)
+        calendar.visibility = 'owner-authenticated'
+        return calendar
+    if require_owner:
+        raise ValueError('Add the PROFILE_TOKEN repository secret using the owner\'s PAT '
+                         'with read:user scope. The workflow will not publish a limited calendar.')
     if os.environ.get('GITHUB_TOKEN'):
         query = '''query($login:String!,$from:DateTime!,$to:DateTime!){
           user(login:$login){contributionsCollection(from:$from,to:$to){
@@ -473,7 +519,8 @@ def render(profile, repos, calendar, now, events=None, theme='dark'):
     svg.append('</g>')
 
     panel(24, 620, 992, 412, '05 / CONTRIBUTIONS', .6)
-    text(994, 648, 'PAST YEAR / UTC', 'dim tiny', 'text-anchor="end"')
+    owner_view = getattr(calendar, 'visibility', 'viewer-limited') == 'owner-authenticated'
+    text(994, 648, 'PAST YEAR / UTC' if owner_view else 'LIMITED VIEW / UTC', 'dim tiny', 'text-anchor="end"')
     svg.append('<g transform="translate(24 650)">' + streak_card(calendar, today) + '</g>')
     text(46, 832, f'{contributions["active_days"]} active days in the displayed year', 'dim small')
     start = min(calendar.days)
@@ -486,7 +533,9 @@ def render(profile, repos, calendar, now, events=None, theme='dark'):
             text(67 + column * 17, 860, month, 'dim tiny')
             last_month = month
     for cell in contribution_cells(calendar, today):
-        svg.append(f'<rect x="{cell["x"] - 5.5}" y="{cell["y"] - 5.5}" width="11" height="11" rx="1" fill="{COLORS[cell["level"]]}"><title>{cell["date"]}: contribution level {cell["level"]}/4</title></rect>')
+        count = getattr(calendar, 'counts', {}).get(cell['date'])
+        label = (f'{count} contributions' if count is not None else f'contribution level {cell["level"]}/4')
+        svg.append(f'<rect x="{cell["x"] - 5.5}" y="{cell["y"] - 5.5}" width="11" height="11" rx="1" fill="{COLORS[cell["level"]]}"><title>{cell["date"]}: {label}</title></rect>')
     text(46, 1011, f'{min(calendar.days):%d %b %Y} - {min(today, max(calendar.days)):%d %b %Y}', 'dim tiny')
     text(802, 1011, 'LESS', 'dim tiny')
     for i, color in enumerate(COLORS):
@@ -522,7 +571,7 @@ def render(profile, repos, calendar, now, events=None, theme='dark'):
     text(x, 1307, command, 'static-command')
     svg.append('<rect x="16" y="1323" width="1008" height="16" fill="#202228"/>')
     text(28, 1335, f'LAST SYNC {now:%Y-%m-%d %H:%M UTC}', 'dim tiny')
-    text(1012, 1335, 'PUBLIC DATA / REFRESH ~1H', 'dim tiny', 'text-anchor="end"')
+    text(1012, 1335, 'GITHUB DATA / REFRESH ~1H', 'dim tiny', 'text-anchor="end"')
     svg.append('<rect x="16" y="60" width="1008" height="1244" fill="url(#scan)" pointer-events="none"/>\n</svg>\n')
     return apply_theme(''.join(svg), theme)
 
@@ -534,6 +583,8 @@ def main():
     parser.add_argument('--readme', type=Path, default=ROOT / 'README.md')
     parser.add_argument('--from-snapshot', type=Path,
                         help='Render saved real data offline, preserving its original sync timestamp')
+    parser.add_argument('--require-owner-calendar', action='store_true',
+                        help='Require PROFILE_TOKEN; never substitute a limited public calendar')
     args = parser.parse_args()
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9-]{0,38}', args.username):
         parser.error('Invalid GitHub username')
@@ -543,12 +594,16 @@ def main():
         now = datetime.now(timezone.utc)
         person = json.loads(fetch(f'https://api.github.com/users/{args.username}'))
         repos = repositories(args.username)
-        calendar = contribution_calendar(args.username, now)
+        calendar = contribution_calendar(args.username, now, require_owner=args.require_owner_calendar)
         events = public_events(args.username)
         snapshot = make_snapshot(person, repos, calendar, events, now)
     person, repos, calendar, events, now = unpack_snapshot(snapshot)
     if person['login'].lower() != args.username.lower():
         raise ValueError('Snapshot belongs to a different GitHub user')
+    if args.require_owner_calendar and calendar.visibility != 'owner-authenticated':
+        raise ValueError('Saved calendar is viewer-limited; fetch owner-authenticated data first')
+    # Upgrade legacy metadata without changing the original fetch time or counts.
+    snapshot = make_snapshot(person, repos, calendar, events, now)
     # Compute every artifact before touching any previously successful output.
     files = build_outputs(person, repos, calendar, events, now)
     files['profile-data.json'] = json.dumps(snapshot, ensure_ascii=False, indent=2) + '\n'
@@ -576,6 +631,8 @@ def make_snapshot(person, repos, calendar, events, now):
             'events': [{key: event[key] for key in ('id', 'type', 'created_at', 'public')}
                        for event in events],
             'calendar': {'source': calendar.source, 'total': calendar.total,
+                         'visibility': calendar.visibility,
+                         'restricted_count': calendar.restricted_count,
                          'days': [{'date': str(day), 'level': calendar.days[day],
                                    'count': calendar.counts[day]}
                                   for day in sorted(calendar.days)]}}
@@ -606,7 +663,9 @@ def unpack_snapshot(snapshot):
         if day in days:
             raise ValueError('Duplicate contribution date in snapshot')
         days[day], counts[day] = item['level'], item['count']
-    calendar = ContributionCalendar(days, counts, raw['total'], raw['source'])
+    calendar = ContributionCalendar(days, counts, raw['total'], raw['source'],
+                                    visibility=raw.get('visibility', 'viewer-limited'),
+                                    restricted_count=raw.get('restricted_count'))
     validate_calendar(calendar, now.date())
     return person, repos, calendar, events, now
 

@@ -245,6 +245,8 @@
   "calendar": {
     "source": "github-graphql",
     "total": 5,
+    "visibility": "viewer-limited",
+    "restricted_count": null,
     "days": [
       {
         "date": "2025-10-29",
