@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "fetched_at": "2026-10-29T21:50:39.903811+00:00",
+  "fetched_at": "2026-10-30T01:59:06.386306+00:00",
   "profile": {
     "login": "vanhhoang",
     "name": "Vanh",
@@ -241,15 +241,10 @@
   ],
   "calendar": {
     "source": "github-graphql",
-    "total": 2257,
+    "total": 2248,
     "visibility": "owner-authenticated",
     "restricted_count": 0,
     "days": [
-      {
-        "date": "2025-10-30",
-        "level": 1,
-        "count": 9
-      },
       {
         "date": "2025-10-31",
         "level": 0,
@@ -2067,6 +2062,11 @@
       },
       {
         "date": "2026-10-29",
+        "level": 0,
+        "count": 0
+      },
+      {
+        "date": "2026-10-30",
         "level": 0,
         "count": 0
       }
