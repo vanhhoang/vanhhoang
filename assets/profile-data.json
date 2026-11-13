@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "fetched_at": "2026-11-12T20:51:48.449080+00:00",
+  "fetched_at": "2026-11-13T01:52:16.947600+00:00",
   "profile": {
     "login": "vanhhoang",
     "name": "Vanh",
@@ -203,11 +203,6 @@
     "visibility": "owner-authenticated",
     "restricted_count": 0,
     "days": [
-      {
-        "date": "2025-11-13",
-        "level": 0,
-        "count": 0
-      },
       {
         "date": "2025-11-14",
         "level": 0,
@@ -2025,6 +2020,11 @@
       },
       {
         "date": "2026-11-12",
+        "level": 0,
+        "count": 0
+      },
+      {
+        "date": "2026-11-13",
         "level": 0,
         "count": 0
       }
