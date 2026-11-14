@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "fetched_at": "2026-11-14T06:32:14.008317+00:00",
+  "fetched_at": "2026-11-14T14:12:49.004373+00:00",
   "profile": {
     "login": "vanhhoang",
     "name": "Vanh",
@@ -188,12 +188,6 @@
       "id": "17372612703",
       "type": "WatchEvent",
       "created_at": "2026-10-16T07:23:57Z",
-      "public": true
-    },
-    {
-      "id": "17270601355",
-      "type": "WatchEvent",
-      "created_at": "2026-10-15T04:34:54Z",
       "public": true
     }
   ],
