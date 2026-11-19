@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "fetched_at": "2026-11-18T22:00:34.581496+00:00",
+  "fetched_at": "2026-11-19T03:34:45.614374+00:00",
   "profile": {
     "login": "vanhhoang",
     "name": "Vanh",
@@ -177,12 +177,6 @@
       "type": "WatchEvent",
       "created_at": "2026-10-20T10:43:43Z",
       "public": true
-    },
-    {
-      "id": "17619274655",
-      "type": "WatchEvent",
-      "created_at": "2026-10-19T16:20:39Z",
-      "public": true
     }
   ],
   "calendar": {
@@ -191,11 +185,6 @@
     "visibility": "owner-authenticated",
     "restricted_count": 0,
     "days": [
-      {
-        "date": "2025-11-19",
-        "level": 0,
-        "count": 0
-      },
       {
         "date": "2025-11-20",
         "level": 0,
@@ -2013,6 +2002,11 @@
       },
       {
         "date": "2026-11-18",
+        "level": 0,
+        "count": 0
+      },
+      {
+        "date": "2026-11-19",
         "level": 0,
         "count": 0
       }
