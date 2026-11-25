@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "fetched_at": "2026-11-25T04:54:31.368611+00:00",
+  "fetched_at": "2026-11-25T15:41:30.373850+00:00",
   "profile": {
     "login": "vanhhoang",
     "name": "Vanh",
@@ -93,26 +93,7 @@
       "stargazers_count": 0
     }
   ],
-  "events": [
-    {
-      "id": "18196534174",
-      "type": "WatchEvent",
-      "created_at": "2026-10-26T03:44:24Z",
-      "public": true
-    },
-    {
-      "id": "18196523801",
-      "type": "WatchEvent",
-      "created_at": "2026-10-26T03:44:11Z",
-      "public": true
-    },
-    {
-      "id": "18194739216",
-      "type": "WatchEvent",
-      "created_at": "2026-10-26T03:06:03Z",
-      "public": true
-    }
-  ],
+  "events": [],
   "calendar": {
     "source": "github-graphql",
     "total": 1833,
